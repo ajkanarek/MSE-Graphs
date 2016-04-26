@@ -1,0 +1,274 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <head>
+    <!-- charset must remain utf-8 to be handled properly by Processing -->
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+    <title>EllinghamDiagram : Built with Processing</title>
+
+    <style type="text/css">
+      /* <![CDATA[ */
+	
+	body {
+  	margin: 60px 0px 0px 55px;
+	  font-family: verdana, geneva, arial, helvetica, sans-serif; 
+	  font-size: 11px; 
+	  background-color: #ddddcc; 
+	  text-decoration: none; 
+	  font-weight: normal; 
+	  line-height: normal; 
+	}
+		 
+	a          { color: #3399cc; }
+	a:link     { color: #3399cc; text-decoration: underline; }
+	a:visited  { color: #3399cc; text-decoration: underline; }
+	a:active   { color: #3399cc; text-decoration: underline; }
+	a:hover    { color: #3399cc; text-decoration: underline; }
+
+      /* ]]> */
+    </style>    
+    <script type="text/javascript">
+
+
+var papplet=null;
+
+function setHidden(index, checkbox) {
+	if(papplet==null) return;
+	papplet.setHidden(index,!checkbox.checked);
+}
+
+function updateStatus() {
+  setTimeout( 'updateStatus()', 50 );
+  if(papplet==null) {
+  	if ( document.applets && document.applets.length > 0 ) {
+        updateLabels();
+    } else {
+        return;
+	}
+  }
+  if(papplet) {
+	document.getElementById("statusO").value=papplet.getValueO();
+   	document.getElementById("statusH").value=papplet.getValueH();
+    document.getElementById("statusC").value=papplet.getValueC();
+  }
+}
+
+function updateLabels() {
+    // if someone is still using IE
+    if(navigator.userAgent.search("MSIE")>0) {
+        papplet = document.applets[1];
+    } else {
+        papplet = document.applets[0];
+    }
+    
+    try {
+        tags=papplet.getTags();
+    } catch(err) {
+        //alert('error ! :'+err.message);
+        papplet=null;
+        return;
+    }
+    taglist=tags.split("\n");
+    var form="";
+    for(var i=0;i<taglist.length;i++) {
+        if(""+taglist[i]=="") continue;
+        var checked = papplet.getHidden(i)?"":"checked";
+        var label="<input type='checkbox' id='plot"+i+"' onclick='setHidden("+i+",this);' " + checked + " />";
+        label+="<label for='plot"+i+"'>"+taglist[i]+"</label>";
+        label+="<br />";
+        form+=label;
+    }
+    document.getElementById("checkboxes").innerHTML=form;
+}
+
+function addItem() {
+    var desc = document.getElementById("addDesc").value;
+    var G = document.getElementById("addG").value;
+    var S = document.getElementById("addS").value;
+    var T0 = document.getElementById("addT0").value;
+    var T1 = document.getElementById("addT1").value;
+    
+    if(!desc) {
+        alert("Enter description");
+        return;
+    }
+    if(!G) {
+        alert("Enter initial free energy");
+        return;
+    }
+    if(!S) {
+        alert("Enter entropy");
+        return;
+    }
+    if(!T0) {
+        alert("Enter initial temperature");
+        return;
+    }
+    if(!T1) {
+        alert("Enter terminal temperature");
+        return;
+    }
+    
+    G=parseFloat(G);
+    S=parseFloat(S);
+    T0=parseFloat(T0);
+    T1=parseFloat(T1);
+    
+    papplet.addData(G,S,desc,T0,T1);
+    
+    document.getElementById("addDesc").value="";
+    document.getElementById("addG").value="";
+    document.getElementById("addS").value="";
+    document.getElementById("addT0").value="";
+    document.getElementById("addT1").value="";
+    
+    updateLabels();
+    
+    alert("Successfully added");
+}
+
+window.onload = function () {
+    setTimeout( 'updateStatus()', 50 );
+}
+
+    </script>
+  </head>
+
+  <body>
+    <div id="content" style="width:800px;">
+      <div id="EllinghamDiagram_container">
+
+	<!-- This version plays nicer with older browsers, 
+	     but requires JavaScript to be enabled. 
+	     http://java.sun.com/javase/6/docs/technotes/guides/jweb/deployment_advice.html -->
+	<script type="text/javascript"
+		src="http://www.java.com/js/deployJava.js"></script>
+	<script type="text/javascript">
+	  /* <![CDATA[ */
+
+	  var attributes = { code:'EllinghamDiagram.class',
+                             archive: 'EllinghamDiagram.jar,core.jar,thermodynamics.jar,core.jar,thermodynamics.jar,core.jar,thermodynamics.jar,core.jar',
+                             width:540, height:600 } ;
+          var parameters = { };
+          var version = '1.5';
+          deployJava.runApplet(attributes, parameters, version);
+
+          /* ]]> */
+        </script>
+        
+	<noscript> <div>
+	  <!--[if !IE]> -->
+	  <object classid="java:EllinghamDiagram.class" 
+            	  type="application/x-java-applet"
+            	  archive="EllinghamDiagram.jar,core.jar,thermodynamics.jar,core.jar,thermodynamics.jar,core.jar,thermodynamics.jar,core.jar"
+            	  width="540" height="600"
+            	  standby="Loading Processing software..." >
+            
+	    <param name="archive" value="EllinghamDiagram.jar,core.jar,thermodynamics.jar,core.jar,thermodynamics.jar,core.jar,thermodynamics.jar,core.jar" />
+	    
+	    <param name="mayscript" value="true" />
+	    <param name="scriptable" value="true" />
+	    
+	    <param name="image" value="loading.gif" />
+	    <param name="boxmessage" value="Loading Processing software..." />
+	    <param name="boxbgcolor" value="#FFFFFF" />
+	    
+	    <param name="test_string" value="outer" />
+	  <!--<![endif]-->
+
+	    <!-- For more instructions on deployment, 
+		 or to update the CAB file listed here, see:
+		 http://java.sun.com/javase/6/webnotes/family-clsid.html
+		 http://java.sun.com/javase/6/webnotes/install/jre/autodownload.html -->
+	    <object classid="clsid:8AD9C840-044E-11D1-B3E9-00805F499D93"
+		    codebase="http://java.sun.com/update/1.6.0/jinstall-6u18-windows-i586.cab"
+		    width="540" height="600"
+		    standby="Loading Processing software..."  >
+	      
+	      <param name="code" value="EllinghamDiagram" />
+	      <param name="archive" value="EllinghamDiagram.jar,core.jar,thermodynamics.jar,core.jar,thermodynamics.jar,core.jar,thermodynamics.jar,core.jar" />
+	      
+	      <param name="mayscript" value="true" />
+	      <param name="scriptable" value="true" />
+	      
+	      <param name="image" value="loading.gif" />
+	      <param name="boxmessage" value="Loading Processing software..." />
+	      <param name="boxbgcolor" value="#FFFFFF" />
+	      
+	      <param name="test_string" value="inner" />
+	      
+	      <p>
+		<strong>
+		  This browser does not have a Java Plug-in.
+		  <br />
+		  <a href="http://www.java.com/getjava" title="Download Java Plug-in">
+		    Get the latest Java Plug-in here.
+		  </a>
+		</strong>
+	      </p>
+	      
+	    </object>
+	    
+	  <!--[if !IE]> -->
+	  </object>
+	  <!--<![endif]-->
+
+	</div> </noscript>
+<div style="float:right;width:200px;">
+<form>
+
+<table style="border-collapse:collapse;width:100%;text-align:center;" border="0" cellspacing="0" cellpadding="0">
+  <tr><td>pO<sub>2</sub></td><td>
+    <input type="text" id="statusO" size="20" name="status" disabled="disabled" />
+  </td></tr>
+  <tr><td>H<sub>2</sub>/H<sub>2</sub>O</td><td>
+    <input type="text" id="statusH" size="20" name="status" disabled="disabled" />
+  </td></tr>
+  <tr><td>CO/CO<sub>2</sub></td><td>
+    <input type="text" id="statusC" size="20" name="status" disabled="disabled" />
+  </td></tr>
+</table>
+</form>
+
+<hr />
+
+<div id="checkboxes">
+Please wait while the applet loads the data.
+</div>
+
+<hr />
+
+<div id="addbox">
+<form>
+  <table style="border-collapse:collapse;width:100%;text-align:center;" border="0" cellspacing="0" cellpadding="0">
+    <tr><td> Description </td><td>
+      <input type="text" id="addDesc" size="15" name="status" />
+    </td></tr>
+    <tr><td> ΔH (kJ/mol)</td><td>
+      <input type="text" id="addG" size="15" name="status" />
+    </td></tr>
+    <tr><td> ΔS (kJ/mol·K)</td><td>
+      <input type="text" id="addS" size="15" name="status" />
+    </td></tr>
+    <tr><td>Temperature(K)</td><td>
+      <input type="text" id="addT0" size="3" name="status" />~<input type="text" id="addT1" size="3" name="status" />
+    </td></tr>
+  </table>
+  <input type="button" value="add" style="width:100%;" onclick="addItem();" />
+</form>
+</div>
+</div>
+
+
+      </div>
+      
+      <p>
+	
+      </p>
+      
+      <p>
+	Built with <a href="http://processing.org" title="Processing.org">Processing</a>
+      </p>
+    </div>
+  </body>
+</html>

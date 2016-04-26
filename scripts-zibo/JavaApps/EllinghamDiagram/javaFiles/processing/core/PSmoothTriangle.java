@@ -1,0 +1,734 @@
+// 
+// Decompiled by Procyon v0.5.30
+// 
+
+package processing.core;
+
+public class PSmoothTriangle implements PConstants
+{
+    private static final boolean EWJORDAN = false;
+    private static final boolean FRY = false;
+    static final int X = 0;
+    static final int Y = 1;
+    static final int Z = 2;
+    static final int R = 3;
+    static final int G = 4;
+    static final int B = 5;
+    static final int A = 6;
+    static final int U = 7;
+    static final int V = 8;
+    static final int DEFAULT_SIZE = 64;
+    float[][] vertices;
+    int vertexCount;
+    static final int ZBUFFER_MIN_COVERAGE = 204;
+    float[] r;
+    float[] dr;
+    float[] l;
+    float[] dl;
+    float[] sp;
+    float[] sdp;
+    boolean interpX;
+    boolean interpZ;
+    boolean interpUV;
+    boolean interpARGB;
+    int rgba;
+    int r2;
+    int g2;
+    int b2;
+    int a2;
+    int a2orig;
+    boolean noDepthTest;
+    PGraphics3D parent;
+    int[] pixels;
+    float[] zbuffer;
+    int width;
+    int height;
+    int width1;
+    int height1;
+    PImage timage;
+    int[] tpixels;
+    int theight;
+    int twidth;
+    int theight1;
+    int twidth1;
+    int tformat;
+    boolean texture_smooth;
+    static final int SUBXRES = 8;
+    static final int SUBXRES1 = 7;
+    static final int SUBYRES = 8;
+    static final int SUBYRES1 = 7;
+    static final int MAX_COVERAGE = 64;
+    boolean smooth;
+    int firstModY;
+    int lastModY;
+    int lastY;
+    int[] aaleft;
+    int[] aaright;
+    int aaleftmin;
+    int aarightmin;
+    int aaleftmax;
+    int aarightmax;
+    int aaleftfull;
+    int aarightfull;
+    private float[] camX;
+    private float[] camY;
+    private float[] camZ;
+    private float ax;
+    private float ay;
+    private float az;
+    private float bx;
+    private float by;
+    private float bz;
+    private float cx;
+    private float cy;
+    private float cz;
+    private float nearPlaneWidth;
+    private float nearPlaneHeight;
+    private float nearPlaneDepth;
+    private float xmult;
+    private float ymult;
+    
+    private final int MODYRES(final int y) {
+        return y & 0x7;
+    }
+    
+    public PSmoothTriangle(final PGraphics3D iparent) {
+        this.vertices = new float[64][36];
+        this.r = new float[64];
+        this.dr = new float[64];
+        this.l = new float[64];
+        this.dl = new float[64];
+        this.sp = new float[64];
+        this.sdp = new float[64];
+        this.aaleft = new int[8];
+        this.aaright = new int[8];
+        this.camX = new float[3];
+        this.camY = new float[3];
+        this.camZ = new float[3];
+        this.parent = iparent;
+        this.reset(0);
+    }
+    
+    public void reset(final int count) {
+        this.vertexCount = count;
+        this.interpX = true;
+        this.interpZ = true;
+        this.interpUV = false;
+        this.interpARGB = true;
+        this.timage = null;
+    }
+    
+    public float[] nextVertex() {
+        if (this.vertexCount == this.vertices.length) {
+            final float[][] temp = new float[this.vertexCount << 1][36];
+            System.arraycopy(this.vertices, 0, temp, 0, this.vertexCount);
+            this.vertices = temp;
+            this.r = new float[this.vertices.length];
+            this.dr = new float[this.vertices.length];
+            this.l = new float[this.vertices.length];
+            this.dl = new float[this.vertices.length];
+            this.sp = new float[this.vertices.length];
+            this.sdp = new float[this.vertices.length];
+        }
+        return this.vertices[this.vertexCount++];
+    }
+    
+    public void texture(final PImage image) {
+        this.timage = image;
+        this.tpixels = image.pixels;
+        this.twidth = image.width;
+        this.theight = image.height;
+        this.tformat = image.format;
+        this.twidth1 = this.twidth - 1;
+        this.theight1 = this.theight - 1;
+        this.interpUV = true;
+    }
+    
+    public void render() {
+        if (this.vertexCount < 3) {
+            return;
+        }
+        this.smooth = true;
+        this.pixels = this.parent.pixels;
+        this.zbuffer = this.parent.zbuffer;
+        this.noDepthTest = false;
+        this.texture_smooth = true;
+        this.width = (this.smooth ? (this.parent.width * 8) : this.parent.width);
+        this.height = (this.smooth ? (this.parent.height * 8) : this.parent.height);
+        this.width1 = this.width - 1;
+        this.height1 = this.height - 1;
+        if (!this.interpARGB) {
+            this.r2 = (int)(this.vertices[0][3] * 255.0f);
+            this.g2 = (int)(this.vertices[0][4] * 255.0f);
+            this.b2 = (int)(this.vertices[0][5] * 255.0f);
+            this.a2 = (int)(this.vertices[0][6] * 255.0f);
+            this.a2orig = this.a2;
+            this.rgba = (0xFF000000 | this.r2 << 16 | this.g2 << 8 | this.b2);
+        }
+        for (int i = 0; i < this.vertexCount; ++i) {
+            this.r[i] = 0.0f;
+            this.dr[i] = 0.0f;
+            this.l[i] = 0.0f;
+            this.dl[i] = 0.0f;
+        }
+        if (this.smooth) {
+            for (int i = 0; i < this.vertexCount; ++i) {
+                final float[] array = this.vertices[i];
+                final int n = 0;
+                array[n] *= 8.0f;
+                final float[] array2 = this.vertices[i];
+                final int n2 = 1;
+                array2[n2] *= 8.0f;
+            }
+            this.firstModY = -1;
+        }
+        int topi = 0;
+        float ymin = this.vertices[0][1];
+        float ymax = this.vertices[0][1];
+        for (int j = 1; j < this.vertexCount; ++j) {
+            if (this.vertices[j][1] < ymin) {
+                ymin = this.vertices[j][1];
+                topi = j;
+            }
+            if (this.vertices[j][1] > ymax) {
+                ymax = this.vertices[j][1];
+            }
+        }
+        this.lastY = (int)(ymax - 0.5f);
+        int lefti = topi;
+        int righti = topi;
+        int y = (int)(ymin + 0.5f);
+        int lefty = y - 1;
+        int righty = y - 1;
+        this.interpX = true;
+        int remaining = this.vertexCount;
+        while (remaining > 0) {
+            while (lefty <= y) {
+                if (remaining <= 0) {
+                    break;
+                }
+                --remaining;
+                final int k = (lefti != 0) ? (lefti - 1) : (this.vertexCount - 1);
+                this.incrementalize_y(this.vertices[lefti], this.vertices[k], this.l, this.dl, y);
+                lefty = (int)(this.vertices[k][1] + 0.5f);
+                lefti = k;
+            }
+            while (righty <= y) {
+                if (remaining <= 0) {
+                    break;
+                }
+                --remaining;
+                final int k = (righti != this.vertexCount - 1) ? (righti + 1) : 0;
+                this.incrementalize_y(this.vertices[righti], this.vertices[k], this.r, this.dr, y);
+                righty = (int)(this.vertices[k][1] + 0.5f);
+                righti = k;
+            }
+            while (y < lefty && y < righty) {
+                if (y >= 0 && y < this.height) {
+                    if (this.l[0] <= this.r[0]) {
+                        this.scanline(y, this.l, this.r);
+                    }
+                    else {
+                        this.scanline(y, this.r, this.l);
+                    }
+                }
+                ++y;
+                this.increment(this.l, this.dl);
+                this.increment(this.r, this.dr);
+            }
+        }
+    }
+    
+    public void unexpand() {
+        if (this.smooth) {
+            for (int i = 0; i < this.vertexCount; ++i) {
+                final float[] array = this.vertices[i];
+                final int n = 0;
+                array[n] /= 8.0f;
+                final float[] array2 = this.vertices[i];
+                final int n2 = 1;
+                array2[n2] /= 8.0f;
+            }
+        }
+    }
+    
+    private void scanline(final int y, final float[] l, final float[] r) {
+        for (int i = 0; i < this.vertexCount; ++i) {
+            this.sp[i] = 0.0f;
+            this.sdp[i] = 0.0f;
+        }
+        int lx = (int)(l[0] + 0.49999f);
+        if (lx < 0) {
+            lx = 0;
+        }
+        int rx = (int)(r[0] - 0.5f);
+        if (rx > this.width1) {
+            rx = this.width1;
+        }
+        if (lx > rx) {
+            return;
+        }
+        if (this.smooth) {
+            final int mody = this.MODYRES(y);
+            this.aaleft[mody] = lx;
+            this.aaright[mody] = rx;
+            if (this.firstModY == -1) {
+                this.firstModY = mody;
+                this.aaleftmin = lx;
+                this.aaleftmax = lx;
+                this.aarightmin = rx;
+                this.aarightmax = rx;
+            }
+            else {
+                if (this.aaleftmin > this.aaleft[mody]) {
+                    this.aaleftmin = this.aaleft[mody];
+                }
+                if (this.aaleftmax < this.aaleft[mody]) {
+                    this.aaleftmax = this.aaleft[mody];
+                }
+                if (this.aarightmin > this.aaright[mody]) {
+                    this.aarightmin = this.aaright[mody];
+                }
+                if (this.aarightmax < this.aaright[mody]) {
+                    this.aarightmax = this.aaright[mody];
+                }
+            }
+            this.lastModY = mody;
+            if (mody != 7 && y != this.lastY) {
+                return;
+            }
+            this.aaleftfull = this.aaleftmax / 8 + 1;
+            this.aarightfull = this.aarightmin / 8 - 1;
+        }
+        this.incrementalize_x(l, r, this.sp, this.sdp, lx);
+        final int offset = this.smooth ? (this.parent.width * (y / 8)) : (this.parent.width * y);
+        int truelx = 0;
+        int truerx = 0;
+        if (this.smooth) {
+            truelx = lx / 8;
+            truerx = (rx + 7) / 8;
+            lx = this.aaleftmin / 8;
+            rx = (this.aarightmax + 7) / 8;
+            if (lx < 0) {
+                lx = 0;
+            }
+            if (rx > this.parent.width1) {
+                rx = this.parent.width1;
+            }
+        }
+        this.interpX = false;
+        for (int x = lx; x <= rx; ++x) {
+            if (this.noDepthTest || this.sp[2] <= this.zbuffer[offset + x]) {
+                if (this.interpUV) {
+                    int tu = (int)this.sp[7];
+                    int tv = (int)this.sp[8];
+                    if (tu > this.twidth1) {
+                        tu = this.twidth1;
+                    }
+                    if (tv > this.theight1) {
+                        tv = this.theight1;
+                    }
+                    if (tu < 0) {
+                        tu = 0;
+                    }
+                    if (tv < 0) {
+                        tv = 0;
+                    }
+                    int txy = tv * this.twidth + tu;
+                    final float[] uv = new float[2];
+                    txy = this.getTextureIndex(x, y * 1.0f / 8.0f, uv);
+                    tu = (int)uv[0];
+                    tv = (int)uv[1];
+                    txy = this.twidth * tv + tu;
+                    int ta;
+                    int tr;
+                    int tg;
+                    int tb;
+                    if (this.smooth || this.texture_smooth) {
+                        final int tuf1 = (int)(255.0f * (uv[0] - tu));
+                        final int tvf1 = (int)(255.0f * (uv[1] - tv));
+                        final int tuf2 = 255 - tuf1;
+                        final int tvf2 = 255 - tvf1;
+                        final int pixel00 = this.tpixels[txy];
+                        final int pixel2 = (tv < this.theight1) ? this.tpixels[txy + this.twidth] : this.tpixels[txy];
+                        final int pixel3 = (tu < this.twidth1) ? this.tpixels[txy + 1] : this.tpixels[txy];
+                        final int pixel4 = (tv < this.theight1 && tu < this.twidth1) ? this.tpixels[txy + this.twidth + 1] : this.tpixels[txy];
+                        if (this.tformat == 4) {
+                            final int px0 = pixel00 * tuf2 + pixel3 * tuf1 >> 8;
+                            final int px2 = pixel2 * tuf2 + pixel4 * tuf1 >> 8;
+                            ta = (px0 * tvf2 + px2 * tvf1 >> 8) * (this.interpARGB ? ((int)(this.sp[6] * 255.0f)) : this.a2orig) >> 8;
+                        }
+                        else if (this.tformat == 2) {
+                            final int p00 = pixel00 >> 24 & 0xFF;
+                            final int p2 = pixel2 >> 24 & 0xFF;
+                            final int p3 = pixel3 >> 24 & 0xFF;
+                            final int p4 = pixel4 >> 24 & 0xFF;
+                            final int px0 = p00 * tuf2 + p3 * tuf1 >> 8;
+                            final int px2 = p2 * tuf2 + p4 * tuf1 >> 8;
+                            ta = (px0 * tvf2 + px2 * tvf1 >> 8) * (this.interpARGB ? ((int)(this.sp[6] * 255.0f)) : this.a2orig) >> 8;
+                        }
+                        else {
+                            ta = (this.interpARGB ? ((int)(this.sp[6] * 255.0f)) : this.a2orig);
+                        }
+                        if (this.tformat == 1 || this.tformat == 2) {
+                            int p00 = pixel00 >> 16 & 0xFF;
+                            int p2 = pixel2 >> 16 & 0xFF;
+                            int p3 = pixel3 >> 16 & 0xFF;
+                            int p4 = pixel4 >> 16 & 0xFF;
+                            int px0 = p00 * tuf2 + p3 * tuf1 >> 8;
+                            int px2 = p2 * tuf2 + p4 * tuf1 >> 8;
+                            tr = (px0 * tvf2 + px2 * tvf1 >> 8) * (this.interpARGB ? ((int)(this.sp[3] * 255.0f)) : this.r2) >> 8;
+                            p00 = (pixel00 >> 8 & 0xFF);
+                            p2 = (pixel2 >> 8 & 0xFF);
+                            p3 = (pixel3 >> 8 & 0xFF);
+                            p4 = (pixel4 >> 8 & 0xFF);
+                            px0 = p00 * tuf2 + p3 * tuf1 >> 8;
+                            px2 = p2 * tuf2 + p4 * tuf1 >> 8;
+                            tg = (px0 * tvf2 + px2 * tvf1 >> 8) * (this.interpARGB ? ((int)(this.sp[4] * 255.0f)) : this.g2) >> 8;
+                            p00 = (pixel00 & 0xFF);
+                            p2 = (pixel2 & 0xFF);
+                            p3 = (pixel3 & 0xFF);
+                            p4 = (pixel4 & 0xFF);
+                            px0 = p00 * tuf2 + p3 * tuf1 >> 8;
+                            px2 = p2 * tuf2 + p4 * tuf1 >> 8;
+                            tb = (px0 * tvf2 + px2 * tvf1 >> 8) * (this.interpARGB ? ((int)(this.sp[5] * 255.0f)) : this.b2) >> 8;
+                        }
+                        else if (this.interpARGB) {
+                            tr = (int)(this.sp[3] * 255.0f);
+                            tg = (int)(this.sp[4] * 255.0f);
+                            tb = (int)(this.sp[5] * 255.0f);
+                        }
+                        else {
+                            tr = this.r2;
+                            tg = this.g2;
+                            tb = this.b2;
+                        }
+                        final int weight = this.smooth ? this.coverage(x) : 255;
+                        if (weight != 255) {
+                            ta = ta * weight >> 8;
+                        }
+                    }
+                    else {
+                        final int tpixel = this.tpixels[txy];
+                        if (this.tformat == 4) {
+                            ta = tpixel;
+                            if (this.interpARGB) {
+                                tr = (int)(this.sp[3] * 255.0f);
+                                tg = (int)(this.sp[4] * 255.0f);
+                                tb = (int)(this.sp[5] * 255.0f);
+                                if (this.sp[6] != 1.0f) {
+                                    ta = (int)(this.sp[6] * 255.0f) * ta >> 8;
+                                }
+                            }
+                            else {
+                                tr = this.r2;
+                                tg = this.g2;
+                                tb = this.b2;
+                                ta = this.a2orig * ta >> 8;
+                            }
+                        }
+                        else {
+                            ta = ((this.tformat == 1) ? 255 : (tpixel >> 24 & 0xFF));
+                            if (this.interpARGB) {
+                                tr = (int)(this.sp[3] * 255.0f) * (tpixel >> 16 & 0xFF) >> 8;
+                                tg = (int)(this.sp[4] * 255.0f) * (tpixel >> 8 & 0xFF) >> 8;
+                                tb = (int)(this.sp[5] * 255.0f) * (tpixel & 0xFF) >> 8;
+                                ta = (int)(this.sp[6] * 255.0f) * ta >> 8;
+                            }
+                            else {
+                                tr = this.r2 * (tpixel >> 16 & 0xFF) >> 8;
+                                tg = this.g2 * (tpixel >> 8 & 0xFF) >> 8;
+                                tb = this.b2 * (tpixel & 0xFF) >> 8;
+                                ta = this.a2orig * ta >> 8;
+                            }
+                        }
+                    }
+                    if (ta == 254 || ta == 255) {
+                        this.pixels[offset + x] = (0xFF000000 | tr << 16 | tg << 8 | tb);
+                        this.zbuffer[offset + x] = this.sp[2];
+                    }
+                    else {
+                        final int a1 = 255 - ta;
+                        final int r2 = this.pixels[offset + x] >> 16 & 0xFF;
+                        final int g1 = this.pixels[offset + x] >> 8 & 0xFF;
+                        final int b1 = this.pixels[offset + x] & 0xFF;
+                        this.pixels[offset + x] = (0xFF000000 | tr * ta + r2 * a1 >> 8 << 16 | (tg * ta + g1 * a1 & 0xFF00) | tb * ta + b1 * a1 >> 8);
+                        if (ta > 204) {
+                            this.zbuffer[offset + x] = this.sp[2];
+                        }
+                    }
+                }
+                else {
+                    int weight2 = this.smooth ? this.coverage(x) : 255;
+                    if (this.interpARGB) {
+                        this.r2 = (int)(this.sp[3] * 255.0f);
+                        this.g2 = (int)(this.sp[4] * 255.0f);
+                        this.b2 = (int)(this.sp[5] * 255.0f);
+                        if (this.sp[6] != 1.0f) {
+                            weight2 = weight2 * (int)(this.sp[6] * 255.0f) >> 8;
+                        }
+                        if (weight2 == 255) {
+                            this.rgba = (0xFF000000 | this.r2 << 16 | this.g2 << 8 | this.b2);
+                        }
+                    }
+                    else if (this.a2orig != 255) {
+                        weight2 = weight2 * this.a2orig >> 8;
+                    }
+                    if (weight2 == 255) {
+                        this.pixels[offset + x] = this.rgba;
+                        this.zbuffer[offset + x] = this.sp[2];
+                    }
+                    else {
+                        final int r3 = this.pixels[offset + x] >> 16 & 0xFF;
+                        final int g2 = this.pixels[offset + x] >> 8 & 0xFF;
+                        final int b2 = this.pixels[offset + x] & 0xFF;
+                        this.a2 = weight2;
+                        final int a1 = 255 - this.a2;
+                        this.pixels[offset + x] = (0xFF000000 | r3 * a1 + this.r2 * this.a2 >> 8 << 16 | g2 * a1 + this.g2 * this.a2 >> 8 << 8 | b2 * a1 + this.b2 * this.a2 >> 8);
+                        if (this.a2 > 204) {
+                            this.zbuffer[offset + x] = this.sp[2];
+                        }
+                    }
+                }
+            }
+            if (!this.smooth || (x >= truelx && x <= truerx)) {
+                this.increment(this.sp, this.sdp);
+            }
+        }
+        this.firstModY = -1;
+        this.interpX = true;
+    }
+    
+    private int coverage(final int x) {
+        if (x >= this.aaleftfull && x <= this.aarightfull && this.firstModY == 0 && this.lastModY == 7) {
+            return 255;
+        }
+        final int pixelLeft = x * 8;
+        final int pixelRight = pixelLeft + 8;
+        int amt = 0;
+        for (int i = this.firstModY; i <= this.lastModY; ++i) {
+            if (this.aaleft[i] <= pixelRight) {
+                if (this.aaright[i] >= pixelLeft) {
+                    amt += ((this.aaright[i] < pixelRight) ? this.aaright[i] : pixelRight) - ((this.aaleft[i] > pixelLeft) ? this.aaleft[i] : pixelLeft);
+                }
+            }
+        }
+        amt <<= 2;
+        return (amt == 256) ? 255 : amt;
+    }
+    
+    private void incrementalize_y(final float[] p1, final float[] p2, final float[] p, final float[] dp, final int y) {
+        float delta = p2[1] - p1[1];
+        if (delta == 0.0f) {
+            delta = 1.0f;
+        }
+        final float fraction = y + 0.5f - p1[1];
+        if (this.interpX) {
+            dp[0] = (p2[0] - p1[0]) / delta;
+            p[0] = p1[0] + dp[0] * fraction;
+        }
+        if (this.interpZ) {
+            dp[2] = (p2[2] - p1[2]) / delta;
+            p[2] = p1[2] + dp[2] * fraction;
+        }
+        if (this.interpARGB) {
+            dp[3] = (p2[3] - p1[3]) / delta;
+            dp[4] = (p2[4] - p1[4]) / delta;
+            dp[5] = (p2[5] - p1[5]) / delta;
+            dp[6] = (p2[6] - p1[6]) / delta;
+            p[3] = p1[3] + dp[3] * fraction;
+            p[4] = p1[4] + dp[4] * fraction;
+            p[5] = p1[5] + dp[5] * fraction;
+            p[6] = p1[6] + dp[6] * fraction;
+        }
+        if (this.interpUV) {
+            dp[7] = (p2[7] - p1[7]) / delta;
+            dp[8] = (p2[8] - p1[8]) / delta;
+            p[7] = p1[7] + dp[7] * fraction;
+            p[8] = p1[8] + dp[8] * fraction;
+        }
+    }
+    
+    private void incrementalize_x(final float[] p1, final float[] p2, final float[] p, final float[] dp, final int x) {
+        float delta = p2[0] - p1[0];
+        if (delta == 0.0f) {
+            delta = 1.0f;
+        }
+        float fraction = x + 0.5f - p1[0];
+        if (this.smooth) {
+            delta /= 8.0f;
+            fraction /= 8.0f;
+        }
+        if (this.interpX) {
+            dp[0] = (p2[0] - p1[0]) / delta;
+            p[0] = p1[0] + dp[0] * fraction;
+        }
+        if (this.interpZ) {
+            dp[2] = (p2[2] - p1[2]) / delta;
+            p[2] = p1[2] + dp[2] * fraction;
+        }
+        if (this.interpARGB) {
+            dp[3] = (p2[3] - p1[3]) / delta;
+            dp[4] = (p2[4] - p1[4]) / delta;
+            dp[5] = (p2[5] - p1[5]) / delta;
+            dp[6] = (p2[6] - p1[6]) / delta;
+            p[3] = p1[3] + dp[3] * fraction;
+            p[4] = p1[4] + dp[4] * fraction;
+            p[5] = p1[5] + dp[5] * fraction;
+            p[6] = p1[6] + dp[6] * fraction;
+        }
+        if (this.interpUV) {
+            dp[7] = (p2[7] - p1[7]) / delta;
+            dp[8] = (p2[8] - p1[8]) / delta;
+            p[7] = p1[7] + dp[7] * fraction;
+            p[8] = p1[8] + dp[8] * fraction;
+        }
+    }
+    
+    private void increment(final float[] p, final float[] dp) {
+        if (this.interpX) {
+            final int n = 0;
+            p[n] += dp[0];
+        }
+        if (this.interpZ) {
+            final int n2 = 2;
+            p[n2] += dp[2];
+        }
+        if (this.interpARGB) {
+            final int n3 = 3;
+            p[n3] += dp[3];
+            final int n4 = 4;
+            p[n4] += dp[4];
+            final int n5 = 5;
+            p[n5] += dp[5];
+            final int n6 = 6;
+            p[n6] += dp[6];
+        }
+        if (this.interpUV) {
+            final int n7 = 7;
+            p[n7] += dp[7];
+            final int n8 = 8;
+            p[n8] += dp[8];
+        }
+    }
+    
+    public void setCamVertices(final float x0, final float y0, final float z0, final float x1, final float y1, final float z1, final float x2, final float y2, final float z2) {
+        this.camX[0] = x0;
+        this.camX[1] = x1;
+        this.camX[2] = x2;
+        this.camY[0] = y0;
+        this.camY[1] = y1;
+        this.camY[2] = y2;
+        this.camZ[0] = z0;
+        this.camZ[1] = z1;
+        this.camZ[2] = z2;
+    }
+    
+    public void setVertices(final float x0, final float y0, final float z0, final float x1, final float y1, final float z1, final float x2, final float y2, final float z2) {
+        this.vertices[0][0] = x0;
+        this.vertices[1][0] = x1;
+        this.vertices[2][0] = x2;
+        this.vertices[0][1] = y0;
+        this.vertices[1][1] = y1;
+        this.vertices[2][1] = y2;
+        this.vertices[0][2] = z0;
+        this.vertices[1][2] = z1;
+        this.vertices[2][2] = z2;
+    }
+    
+    boolean precomputeAccurateTexturing() {
+        final int o0 = 0;
+        final int o2 = 1;
+        final int o3 = 2;
+        final PMatrix3D myMatrix = new PMatrix3D(this.vertices[o0][7], this.vertices[o0][8], 1.0f, 0.0f, this.vertices[o2][7], this.vertices[o2][8], 1.0f, 0.0f, this.vertices[o3][7], this.vertices[o3][8], 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+        final boolean invertSuccess = myMatrix.invert();
+        if (!invertSuccess) {
+            return false;
+        }
+        final float m00 = myMatrix.m00 * this.camX[o0] + myMatrix.m01 * this.camX[o2] + myMatrix.m02 * this.camX[o3];
+        final float m2 = myMatrix.m10 * this.camX[o0] + myMatrix.m11 * this.camX[o2] + myMatrix.m12 * this.camX[o3];
+        final float m3 = myMatrix.m20 * this.camX[o0] + myMatrix.m21 * this.camX[o2] + myMatrix.m22 * this.camX[o3];
+        final float m4 = myMatrix.m00 * this.camY[o0] + myMatrix.m01 * this.camY[o2] + myMatrix.m02 * this.camY[o3];
+        final float m5 = myMatrix.m10 * this.camY[o0] + myMatrix.m11 * this.camY[o2] + myMatrix.m12 * this.camY[o3];
+        final float m6 = myMatrix.m20 * this.camY[o0] + myMatrix.m21 * this.camY[o2] + myMatrix.m22 * this.camY[o3];
+        final float m7 = -(myMatrix.m00 * this.camZ[o0] + myMatrix.m01 * this.camZ[o2] + myMatrix.m02 * this.camZ[o3]);
+        final float m8 = -(myMatrix.m10 * this.camZ[o0] + myMatrix.m11 * this.camZ[o2] + myMatrix.m12 * this.camZ[o3]);
+        final float m9 = -(myMatrix.m20 * this.camZ[o0] + myMatrix.m21 * this.camZ[o2] + myMatrix.m22 * this.camZ[o3]);
+        final float px = m3;
+        final float py = m6;
+        final float pz = m9;
+        final float TEX_WIDTH = this.twidth;
+        final float TEX_HEIGHT = this.theight;
+        final float resultT0x = m00 * TEX_WIDTH + m3;
+        final float resultT0y = m4 * TEX_WIDTH + m6;
+        final float resultT0z = m7 * TEX_WIDTH + m9;
+        final float result0Tx = m2 * TEX_HEIGHT + m3;
+        final float result0Ty = m5 * TEX_HEIGHT + m6;
+        final float result0Tz = m8 * TEX_HEIGHT + m9;
+        final float mx = resultT0x - m3;
+        final float my = resultT0y - m6;
+        final float mz = resultT0z - m9;
+        final float nx = result0Tx - m3;
+        final float ny = result0Ty - m6;
+        final float nz = result0Tz - m9;
+        this.ax = (py * nz - pz * ny) * TEX_WIDTH;
+        this.ay = (pz * nx - px * nz) * TEX_WIDTH;
+        this.az = (px * ny - py * nx) * TEX_WIDTH;
+        this.bx = (my * pz - mz * py) * TEX_HEIGHT;
+        this.by = (mz * px - mx * pz) * TEX_HEIGHT;
+        this.bz = (mx * py - my * px) * TEX_HEIGHT;
+        this.cx = ny * mz - nz * my;
+        this.cy = nz * mx - nx * mz;
+        this.cz = nx * my - ny * mx;
+        this.nearPlaneWidth = this.parent.rightScreen - this.parent.leftScreen;
+        this.nearPlaneHeight = this.parent.topScreen - this.parent.bottomScreen;
+        this.nearPlaneDepth = this.parent.nearPlane;
+        this.xmult = this.nearPlaneWidth / this.parent.width;
+        this.ymult = this.nearPlaneHeight / this.parent.height;
+        return true;
+    }
+    
+    private int getTextureIndex(float sx, float sy, final float[] uv) {
+        sx = this.xmult * (sx - this.parent.width / 2.0f + 0.5f);
+        sy = this.ymult * (sy - this.parent.height / 2.0f + 0.5f);
+        final float sz = this.nearPlaneDepth;
+        final float a = sx * this.ax + sy * this.ay + sz * this.az;
+        final float b = sx * this.bx + sy * this.by + sz * this.bz;
+        final float c = sx * this.cx + sy * this.cy + sz * this.cz;
+        int u = (int)(a / c);
+        int v = (int)(b / c);
+        uv[0] = a / c;
+        uv[1] = b / c;
+        if (uv[0] < 0.0f) {
+            uv[0] = (u = 0);
+        }
+        if (uv[1] < 0.0f) {
+            uv[1] = (v = 0);
+        }
+        if (uv[0] >= this.twidth) {
+            uv[0] = this.twidth - 1;
+            u = this.twidth - 1;
+        }
+        if (uv[1] >= this.theight) {
+            uv[1] = this.theight - 1;
+            v = this.theight - 1;
+        }
+        final int result = v * this.twidth + u;
+        return result;
+    }
+    
+    public void setIntensities(final float ar, final float ag, final float ab, final float aa, final float br, final float bg, final float bb, final float ba, final float cr, final float cg, final float cb, final float ca) {
+        this.vertices[0][3] = ar;
+        this.vertices[0][4] = ag;
+        this.vertices[0][5] = ab;
+        this.vertices[0][6] = aa;
+        this.vertices[1][3] = br;
+        this.vertices[1][4] = bg;
+        this.vertices[1][5] = bb;
+        this.vertices[1][6] = ba;
+        this.vertices[2][3] = cr;
+        this.vertices[2][4] = cg;
+        this.vertices[2][5] = cb;
+        this.vertices[2][6] = ca;
+    }
+}

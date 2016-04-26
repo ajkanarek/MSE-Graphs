@@ -1,0 +1,14 @@
+/* Empty. Add your own CSS if you like */
+html, body {
+	height: 100%;
+}
+
+#container {
+	height: 90%;
+	width: 90%;
+	position: absolute;
+}
+
+#data {
+	position: relative;
+}

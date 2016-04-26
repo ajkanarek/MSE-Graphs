@@ -1,0 +1,14 @@
+/* Empty. Add your own CSS if you like */
+#graph {
+  height: 200px;
+  width: 100%;
+  margin: 50px;
+}
+
+#mycanvas {
+  border: solid black 1px;
+}
+
+#sine-wave {
+  margin: 50px;
+}
