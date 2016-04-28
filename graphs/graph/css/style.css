@@ -1,4 +1,7 @@
 /* Empty. Add your own CSS if you like */
+html, body {
+	height: 100%;
+}
 #graph {
   height: 200px;
   width: 100%;
